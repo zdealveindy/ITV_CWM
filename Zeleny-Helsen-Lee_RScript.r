@@ -1,4 +1,4 @@
-# R code Supplement for Zeleny, Helsen & Lee: Extending community-weighted mean approach for intraspecific trait variation: what to do with overly optimistic standard tests?
+# R code Supplement for Zeleny, Helsen & Lee: Extending the CWM approach to intraspecific trait variation: how to deal with overly optimistic standard tests?
 # Authors of the script: David Zeleny & Enoch Lee
 
 # Version 0.8, May 30, 2021
