@@ -308,7 +308,7 @@ traits <- read.delim ("https://raw.githubusercontent.com/zdealveindy/ITV_CWM/mai
 topo <- read.delim ("https://raw.githubusercontent.com/zdealveindy/ITV_CWM/main/LFDP025_topo.txt")
 
 # Define functions ----
-# Define function quantifying the Type I error rare inflation for parametric test site-specific CWM - env relationship
+# Define function quantifying the Type I error rate inflation for parametric test site-specific CWM - env relationship
 inflation_ss <- function (com, traits_ss, env, alpha = 0.05, nrep = 1000) 
 {
   p_null <- replicate (nrep, expr = {
