@@ -1,7 +1,6 @@
-# R code Supplement for Zeleny, Helsen & Lee: Extending the CWM approach to intraspecific trait variation: how to deal with overly optimistic standard tests?
-# Authors of the script: David Zeleny & Enoch Lee
-
-# Version 0.8, May 30, 2021
+# Extending the CWM approach to intraspecific trait variation: how to deal with overly optimistic standard tests?
+# Oecologia, Methods paper
+# Author of the script: David Zeleny
 
 # Install and upload libraries ----
 #devtools::install_github ('zdealveindy/simcom')
@@ -16,7 +15,7 @@ library (abind)
 
 # Definition of functions ----
 
-# Calculates site-specific CWM from "traits" (matrix with rows = sites, cols = species)
+# cwm_ss - calculates site-specific CWM from "traits" (matrix with rows = sites, cols = species)
 cwm_ss <- function (com, traits_ss, wstand = FALSE)
 {
   com <- as.matrix (com)
@@ -26,16 +25,16 @@ cwm_ss <- function (com, traits_ss, wstand = FALSE)
   return (ci)
 }
 
-# Calculates fixed CWM from "traits" (matrix with rows = sites, cols = species)
+# cwm_f - calculates fixed CWM from "traits" (matrix with rows = sites, cols = species)
 cwm_f <- function (com, traits_ss, wstand = FALSE) # calculates fixed CWM values from traits; wstand not implemented yet
 {
   com <- as.matrix(com)
   traits_f <- colMeans (traits_ss, na.rm = TRUE)
   cwm_temp <- rowSums (t(apply (com, 1, FUN = function (x) x/sum  (x)) * traits_f), na.rm = T)
-  return(cwm_temp)
+  return (cwm_temp)
 }
 
-# Calculates intraspecific CWM from "traits" (matrix with rows = sites, cols = species)
+# cwm_itv - calculates intraspecific CWM from "traits" (matrix with rows = sites, cols = species)
 cwm_itv <- function (com, traits_ss, wstand = FALSE) # calculates ITV CWM values from traits; wstand not implemented yet
 {
   com <- as.matrix(com)
@@ -45,13 +44,13 @@ cwm_itv <- function (com, traits_ss, wstand = FALSE) # calculates ITV CWM values
   return(cwm_temp)
 }
 
-# sample_traits_ss - Samples t_ij matrix (intraspecific trait variation matrix with site specific trait values)
+# sample_traits_ss - permutes t_ij matrix (intraspecific trait variation matrix with site specific trait values)
 # Arguments:
 # traits_ss - matrix of site-specific trait values (T); sites in rows, species in columns
 # intra - logical (default FALSE), should intraspecific trait values be permutated? (column-wise permutations in the matrix with intraspecific trait values, ??T)
 # inter - logical (default FALSE), should interspecific trait values be permuted (elements in the vector mean_t)
 # rand - logical (default FALSE), should all (non-missing) values in traits_ss be randomly permuted?
-
+# replace_by_norm - logical (default FALSE), should all (non-missing) values in traits_ss be replaced by those randomly drawn from normal distribution (mean = 0, sd = 1)?
 sample_traits_ss <- function (traits_ss, intra = FALSE, inter = FALSE, rand = FALSE, replace_by_norm = FALSE) # permutes traits in t_ij
 {
   t_ij_perm <- traits_ss  # in case that both inter and intra stay FALSE
@@ -80,19 +79,19 @@ sample_traits_ss <- function (traits_ss, intra = FALSE, inter = FALSE, rand = FA
   return (t_ij_perm)
 }
   
-# Generate t_ij matrix from com and env simulated data (optionally adds random noise using jitter function)
+# gen_traits_ss - generates t_ij matrix from com and env simulated data
 gen_traits_ss <- function (com, env, scale = TRUE, m = 1, jitter = NULL, amount = NULL)
 {
   t_ij_orig <- sweep (ifelse (com>0,1,NA), 1, env, FUN = '*')
   mean_tij <- colMeans (t_ij_orig, na.rm = T)
   dt_ij <- sweep (t_ij_orig, 2, mean_tij, FUN = '-')
   t_ij <- sweep (dt_ij*m, 2, mean_tij, FUN = '+')
-  if (scale) t_ij <- (t_ij - min (t_ij, na.rm = T))/(max (t_ij, na.rm = T) - min (t_ij, na.rm = T))
   if (!is.null (jitter)) t_ij <- jitter (t_ij, jitter, amount)
+  if (scale) t_ij <- (t_ij - min (t_ij, na.rm = T))/(max (t_ij, na.rm = T) - min (t_ij, na.rm = T))
   t_ij
 }
 
-# Calculates intra- vs interspecific trait variation ratio from traits_ss
+# Calculates intraspecific vs interspecific trait variation ratio from traits_ss
 intra_inter_ratio <- function (traits_ss) {
   sd_intra <- apply (traits_ss, 2, sd, na.rm = TRUE)
   t_mean <- colMeans (traits_ss, na.rm = TRUE)
@@ -100,33 +99,64 @@ intra_inter_ratio <- function (traits_ss) {
   return (mean (sd_intra/sd_inter, na.rm = TRUE))
 }
 
-# Plots trait-env relationship with intraspecific trait variation (plot_reg is just helper function)
+# plot_ss and plot_reg - plots trait-env relationship with intraspecific trait variation (plot_reg is just helper function)
 plot_reg <- function (x, y){
   LM <- lm (y ~ x)
   pred <- predict (LM, newdata = list (x = c(min (x), max (x))))
   lines (x = c(min (x), max (x)), y = pred)
 }
 
-plot_itv <- function (com, traits_ss, env)
+# plot_ss was previously called plot_itv
+plot_ss <- function (com, traits_ss, env, ...)
 {
   t_e <- lapply (1:ncol (com), FUN = function (x) {t <- traits_ss[com[,x]>0, x]; e <- env[com[,x]>0]; data.frame (e = e, t = t)})
+  t_range <- range (traits_ss, na.rm = TRUE)
   plot.new ()
-  plot.window (xlim = c(min (env), max (env)), ylim = c(min (traits_ss, na.rm = T), max (traits_ss, na.rm = T)), xlab = 'env', ylab = 'trait')
+  plot.window (xlim = c(min (env), max (env)), ylim = c(t_range[1], t_range[2]))
   axis (1)
   axis (2)
+  title (xlab = 'env', ylab = 'trait')
   box (bty = 'l')
   #lapply (t_e, FUN = function (sp) points (t ~ e, sp))
   lapply (t_e, FUN = function (sp) if (nrow (sp)>0) plot_reg (sp$e, sp$t))
 }
 
-# ITV extended max permutation test of site-specific CWM ~ env regression
+plot_itv <- function (com, traits_ss, env)
+{
+  t_e <- lapply (1:ncol (com), FUN = function (x) {t <- traits_ss[com[,x]>0, x]; t_mean <- mean (t, na.rm = TRUE); e <- env[com[,x]>0]; data.frame (e = e, t_itv = t-t_mean)})
+  t_itv_range <- range (unlist (lapply (t_e, FUN = function (x) x$t_itv)), na.rm = TRUE)
+  plot.new ()
+  plot.window (xlim = c(min (env), max (env)), ylim = c(t_itv_range[1], t_itv_range[2]))
+  axis (1)
+  axis (2)
+  title (xlab = 'env', ylab = 'trait')
+  box (bty = 'l')
+  #lapply (t_e, FUN = function (sp) points (t ~ e, sp))
+  lapply (t_e, FUN = function (sp) if (nrow (sp)>0) plot_reg (sp$e, sp$t_itv))
+}
+
+plot_f <- function (com, traits_ss, env)
+{
+  t_e <- lapply (1:ncol (com), FUN = function (x) {t <- traits_ss[com[,x]>0, x]; t_mean <- mean (t, na.rm = TRUE); t_fix <- rep (t_mean, length (t)); e <- env[com[,x]>0]; data.frame (e = e, t_fix = t_fix)})
+  t_range <- range (traits_ss, na.rm = TRUE)
+  plot.new ()
+  plot.window (xlim = c(min (env), max (env)), ylim = c(t_range[1], t_range[2]))
+  axis (1)
+  axis (2)
+  title (xlab = 'env', ylab = 'trait')
+  box (bty = 'l')
+  #lapply (t_e, FUN = function (sp) points (t ~ e, sp))
+  lapply (t_e, FUN = function (sp) if (nrow (sp)>0) plot_reg (sp$e, sp$t_fix))
+}
+
+# test_cwm_ss - max permutation test of site-specific CWM ~ env regression
 test_cwm_ss <- function (com, traits_ss, env, perm = 199)
 {
   CWM_ss_obs <- cwm_ss (com = com, traits_ss = traits_ss)
-  LM <- lm (CWM_ss_obs ~ env)
-  F_obs <- summary (LM)$fstatistic[1]
-  r2 <- summary (LM)$r.squared
-  P_par <- anova (LM)$`Pr(>F)`[1]
+  LM <- lm (scale (CWM_ss_obs) ~ scale (env))
+  an <- anova (LM)
+  su <- summary (LM)
+  F_obs <- su$fstatistic[1]
 
   mean_t <- colMeans (traits_ss, na.rm = TRUE)
   delta_T <- apply (traits_ss, 2, FUN = function (x) x - mean (x, na.rm = T))
@@ -134,40 +164,43 @@ test_cwm_ss <- function (com, traits_ss, env, perm = 199)
   F_col_rand <- replicate (perm, expr = {
     traits_ss_rand <- sample_traits_ss (traits_ss = traits_ss, intra = TRUE, inter = TRUE)
     CWM_ss_rand <- cwm_ss (com, traits_ss_rand)
-    summary (lm (CWM_ss_rand ~ env))$fstatistic[1]
+    summary (lm (scale (CWM_ss_rand) ~ scale (env)))$fstatistic[1]
   })
   F_col_all <- c(F_col_rand, F_obs)
   P_col_i <- sum (F_col_all >= F_obs)/(perm+1)
   
   F_row_rand <- replicate (perm, expr = {
-    summary (lm (CWM_ss_obs ~ sample (env)))$fstatistic[1]
+    summary (lm (scale (CWM_ss_obs) ~ scale (sample (env))))$fstatistic[1]
   })
   F_row_all <- c(F_row_rand, F_obs)
   P_row <- sum (F_row_all >= F_obs)/(perm+1)
   P_max <- max (P_row, P_col_i)
   
-  return (list (F_obs = F_obs, r2 = r2, P_par = P_par, P_row = P_row, P_col_i = P_col_i, P_max = P_max, perm = perm))
+  return (list (SSR = an$`Sum Sq`[1], SSE = an$`Sum Sq`[2], b1 = su$coefficients[2,1], b1_se = su$coefficients[2,2], F_obs = F_obs, r2 = su$r.squared, P_par = an$`Pr(>F)`[1], P_row = P_row, P_col_i = P_col_i, P_max = P_max, perm = perm))
 }
 
-# "Original" max permutation test of fixed CWM ~ env regression (using function test_cwm from package weimea)
-test_cwm_f <- function (com, traits_ss, env, perm = 199)
+# test_cwm_f - max permutation test of fixed CWM ~ env regression (using weimea package)
+test_cwm_f <- function (com, traits_ss, env, perm = 199) 
 {
   require (weimea)  
   traits_f <- colMeans (traits_ss, na.rm = TRUE)
   CWM_f <- cwm (com = com, traits = traits_f)
+  LM <- lm (scale (CWM_f$traits) ~ scale (env))  # calculates standardized regression
+  an <- anova (LM)
+  su <- summary (LM)
   res_test_cwm <- test_cwm (cwm = CWM_f, env = env, method = 'lm', test = c('par', 'max'), perm = perm)
-  return (list (F_obs = res_test_cwm$out$F, r2 = res_test_cwm$out$r2, P_par = res_test_cwm$out$P_par, P_max = res_test_cwm$out$P_max, perm = perm))
+  return (list (SSR = an$`Sum Sq`[1], SSE = an$`Sum Sq`[2], b1 = su$coefficients[2,1], b1_se = su$coefficients[2,2], F_obs = res_test_cwm$out$F, r2 = res_test_cwm$out$r2, P_par = res_test_cwm$out$P_par, P_max = res_test_cwm$out$P_max, perm = perm))
 }
- 
-# Standard parametric F-tests of intraspecific CWM ~ env regression
+
+# test_cwm_itv - parametric test of site-specific CWM ~ env regression  
 test_cwm_itv <- function (com, traits_ss, env, perm = 199) 
 {
   CWM_itv_obs <- cwm_itv (com = com, traits_ss = traits_ss)
-  LM <- lm (CWM_itv_obs ~ env)
-  F_obs <- summary (LM)$fstatistic[1]
-  r2 <- summary (LM)$r.squared
-  P_par <- anova (LM)$`Pr(>F)`[1]
-  return (list (F_obs = F_obs, r2 = r2, P_par = P_par, perm = perm))
+  LM <- lm (scale (CWM_itv_obs) ~ scale (env))
+  an <- anova (LM)
+  su <- summary (LM)
+
+  return (list (SSR = an$`Sum Sq`[1], SSE = an$`Sum Sq`[2], b1 = su$coefficients[2,1], b1_se = su$coefficients[2,2], F_obs = su$fstatistic[1], r2 = su$r.squared, P_par = an$`Pr(>F)`[1], perm = perm))
 }
   
 # Helper function: permutes elements in vector of any length (incl 1), from package gtools
@@ -175,15 +208,38 @@ permute <- function (x) {
   sample(x, size = length(x), replace = FALSE)
 }
 
+# Creates simple simulated data using the simcom package and plots them ----
+sim <- simul.comm (totS = 50, min.niche.breath = 500, max.niche.breath = 5000) # 50 species
+sam <- sample.comm (sim, Np = 25) # 25 sites
 
-# Change number of clusters for parallel computing----
-no_clus <- 18
+com <- sam$a.mat
+env <- sam$sample.x
 
-# 1) Site-specific CWM tested by combined permutation test + all other tests ----
-perm <- 1000  # how many standard test per community is done
-no_rep <- 50  # replicate community data (with the same parameters)
+traits_ss <- gen_traits_ss (com = com, env = env, m = .2, scale = FALSE, jitter = 0, amount = NULL)
+traits_fixed <- colMeans (traits_ss, na.rm = T)
 
-set.seed (35974) # set throughout the script to maintain reproducibility with published figures and tables
+CWM_ITV <- cwm_ss (com = com, traits_ss = traits_ss)
+plot (CWM_ITV ~ env)
+
+CWM_SS_noITV <- cwm_ss (com = com, traits_ss = sample_traits_ss (traits_ss, intra = T, inter = F))
+plot (CWM_SS_noITV ~ env)
+
+CWM_fixed <- cwm (com, traits_fixed)
+plot (CWM_fixed$traits ~ env)
+
+plot_ss (com = com, traits_ss = traits_ss, env = env)
+plot_itv (com = com, traits_ss = traits_ss, env = env)
+plot_f (com = com, traits_ss = traits_ss, env = env)
+plot_ss (com = com, traits_ss = sample_traits_ss (traits_ss, intra = TRUE), env = env)  # plots intraspecific trait variation
+
+# Change number of clusters ----
+no_clus <- 10
+
+# CWM site specific tested by combined permutation test + all other tests ----
+perm <- 100 #1000  # how many standard test per community is done
+no_rep <- 5 #50  # replicate community data (with the same parameters)
+
+set.seed (35974)
 
 cl <- makeCluster(no_clus)
 clusterEvalQ (cl, {library (weimea); library (simcom)})
@@ -197,7 +253,7 @@ P_ss_m_all_max <- parLapply (cl, 1:no_rep, fun = function (x) {
   env <- sam$sample.x
   
   P_ss_m <- lapply (seq (0, 5, by = 0.5), FUN = function (m) { 
-    traits_ss <- gen_traits_ss (com = com, env = env, m = m, scale = TRUE, amount = ifelse (m == 0, 0, .1))
+    traits_ss <- gen_traits_ss (com = com, env = env, m = m, scale = TRUE, jitter = 1, amount = ifelse (m == 0, 0, 1000))
     iir <- intra_inter_ratio (traits_ss)
     P_ss <- sapply (1:perm, FUN = function (x) {
       traits_ss_rand <- sample_traits_ss (traits_ss, intra = T, inter = T)
@@ -226,13 +282,18 @@ P_ss_m_all_max <- parLapply (cl, 1:no_rep, fun = function (x) {
 stopCluster (cl)
 
 # Save the data which are result of costly calculation
-save (P_ss_m_all_max, file = 'P_ss_m_all_max.r')
-#load (file = 'P_ss_m_all_max.r')
+#save (P_ss_m_all_max, file = 'P_ss_m_all_max_20220921.r')
+#load (file = 'P_ss_m_all_max_20220921.r')
 
 summary_P_ss_m_all_max <- sapply (P_ss_m_all_max, simplify = 'array', FUN = function (repl)
   sapply (repl, FUN = function (x)
     c(m = unique (x[1,]), # m
       iir = mean (x[3,]), # iir
+      SSR_mean = mean (x["SSR",]),
+      SSE_mean = mean (x["SSE",]),
+      b1_mean = mean (x["b1",]),
+      b1_se_mean = mean (x["b1_se",]),
+      R2_ss_mean = mean (x["r2",]),
       P_par_IF = sum(x["P_par",]<0.05)/(ncol (x)*0.05), # P_par
       P_row_IF = sum(x["P_row",]<0.05)/(ncol (x)*0.05), # P_row
       P_col_i_IF = sum(x["P_col_i",]<0.05)/(ncol (x)*0.05), # P_col_i
@@ -243,7 +304,8 @@ summary_P_ss_m_all_max <- sapply (P_ss_m_all_max, simplify = 'array', FUN = func
 mean_P_ss_m_all_max <- apply (summary_P_ss_m_all_max, MARGIN = c(2,1), mean)
 sd_P_ss_m_all_max <- apply (summary_P_ss_m_all_max, MARGIN = c(2,1), sd)
 
-mean_P_ss_m_all_max[12,'iir'] <- 3.5  # arbitrary value for the relative ITV index of completely random scenario
+
+mean_P_ss_m_all_max[12,'iir'] <- 3.5  # arbitrary value for IIR of completely random scenario
 
 # Plot the dependence of inflation index on magnitude of intraspecific trait variation ----
 jpeg ('standard_max_test_cwm_ss.jpg', width = 12, height = 12, units = 'cm', res = 600, pointsize = 8)
@@ -281,6 +343,7 @@ lines (P_par_itv_IF ~ iir, mean_P_ss_m_all_max[-1:-10,], lty = c('dashed'))
 points (P_par_itv_IF ~ iir, mean_P_ss_m_all_max[-1,], pch = rep (21, 11), bg = c(rep ('gray', 10), 'white'))
 mtext (side = 3, text = '(b)', adj = -.25, line = 2, cex = 1.1, font = 2)
 
+
 # Plot results for CWM_ss and max test of row- and combined col-based permutation tests
 plot (P_max_IF ~ iir, mean_P_ss_m_all_max, xlim = c(0, 3.5), ylim = c(0, 16), type = 'n', las = 1, xaxt = 'n', bty = 'l', ann = FALSE)
 title (xlab = list ('Relative ITV index'), ylab = expression (Inflation~index~(alpha==0.05)), line = 2.5)
@@ -298,17 +361,93 @@ lines (P_max_IF ~ iir, mean_P_ss_m_all_max[-12,], lty = c('solid'))
 lines (P_max_IF ~ iir, mean_P_ss_m_all_max[-1:-10,], lty = c('dashed'))
 points (P_max_IF ~ iir, mean_P_ss_m_all_max, pch = c(22, rep (21, 11)), bg = c('black', rep ('gray', 10), 'white'))
 mtext (side = 3, text = '(c)', adj = -.25, line = 2, cex = 1.1, font = 2)
+
+plot (R2_ss_mean ~ iir, mean_P_ss_m_all_max, xlim = c(0, 3.5), ylim = c(0, 0.5), type = 'n', las = 1, xaxt = 'n', bty = 'l', ann = F)
+title (xlab = list ('Relative ITV index'), ylab = expression (r^2), line = 2.5)
+title (main = list ("Site-specific CWM ~ env\nExplained variation", cex = 1))
+axis (1, at = seq (0, 3, by = 0.5), labels = format (seq (0, 3, by = 0.5)))
+axis (1, at = 3.5, labels = expression (infinity))
+abline (h = 1/(25-1), col = 'grey', lty = 'dashed')
+for (i in seq (1, nrow (mean_P_ss_m_all_max)))
+{
+  lines (x = c(mean_P_ss_m_all_max[i, 'iir'], mean_P_ss_m_all_max[i, 'iir']), y = c(mean_P_ss_m_all_max[i, 'R2_ss_mean'] - sd_P_ss_m_all_max[i, 'R2_ss_mean'], c(mean_P_ss_m_all_max[i, 'R2_ss_mean'] + sd_P_ss_m_all_max[i, 'R2_ss_mean'])), col = 'darkgrey')
+}
+lines (R2_ss_mean ~ iir, mean_P_ss_m_all_max[-12,], lty = c('solid'))
+lines (R2_ss_mean ~ iir, mean_P_ss_m_all_max[-1:-10,], lty = c('dashed'))
+points (R2_ss_mean ~ iir, mean_P_ss_m_all_max, pch = c(22, rep (21, 11)), bg = c('black', rep ('gray', 10), 'white'))
+mtext (side = 3, text = '(d)', adj = -.25, line = 2, cex = 1.1, font = 2)
 dev.off ()
+
+# Effect sizes and ITV ---
+plot (R2_ss_mean ~ iir, mean_P_ss_m_all_max, xlim = c(0, 3.5), ylim = c(0, 0.5), type = 'n', las = 1, xaxt = 'n', bty = 'l', ann = F)
+title (xlab = list ('Relative ITV index'), ylab = expression (r^2), line = 2.5)
+title (main = list ("Site-specific CWM ~ env\nExplained variation", cex = 1))
+axis (1, at = seq (0, 3, by = 0.5), labels = format (seq (0, 3, by = 0.5)))
+axis (1, at = 3.5, labels = expression (infinity))
+abline (h = 1/(25-1), col = 'grey', lty = 'dashed')
+for (i in seq (1, nrow (mean_P_ss_m_all_max)))
+{
+  lines (x = c(mean_P_ss_m_all_max[i, 'iir'], mean_P_ss_m_all_max[i, 'iir']), y = c(mean_P_ss_m_all_max[i, 'R2_ss_mean'] - sd_P_ss_m_all_max[i, 'R2_ss_mean'], c(mean_P_ss_m_all_max[i, 'R2_ss_mean'] + sd_P_ss_m_all_max[i, 'R2_ss_mean'])), col = 'darkgrey')
+}
+lines (R2_ss_mean ~ iir, mean_P_ss_m_all_max[-12,], lty = c('solid'))
+lines (R2_ss_mean ~ iir, mean_P_ss_m_all_max[-1:-10,], lty = c('dashed'))
+points (R2_ss_mean ~ iir, mean_P_ss_m_all_max, pch = c(22, rep (21, 11)), bg = c('black', rep ('gray', 10), 'white'))
+mtext (side = 3, text = '(d)', adj = -.25, line = 2, cex = 1.1, font = 2)
+
+plot (SSR_mean ~ iir, mean_P_ss_m_all_max, xlim = c(0, 3.5), ylim = c(0, 10), type = 'n', las = 1, xaxt = 'n', bty = 'l', ann = F)
+title (xlab = list ('Relative ITV index'), ylab = 'SSR', line = 2.5)
+title (main = list ("Site-specific CWM ~ env\nExplained sum of squares", cex = 1))
+axis (1, at = seq (0, 3, by = 0.5), labels = format (seq (0, 3, by = 0.5)))
+axis (1, at = 3.5, labels = expression (infinity))
+for (i in seq (1, nrow (mean_P_ss_m_all_max)))
+{
+  lines (x = c(mean_P_ss_m_all_max[i, 'iir'], mean_P_ss_m_all_max[i, 'iir']), y = c(mean_P_ss_m_all_max[i, 'SSR_mean'] - sd_P_ss_m_all_max[i, 'SSR_mean'], c(mean_P_ss_m_all_max[i, 'SSR_mean'] + sd_P_ss_m_all_max[i, 'SSR_mean'])), col = 'darkgrey')
+}
+lines (SSR_mean ~ iir, mean_P_ss_m_all_max[-12,], lty = c('solid'))
+lines (SSR_mean ~ iir, mean_P_ss_m_all_max[-1:-10,], lty = c('dashed'))
+points (SSR_mean ~ iir, mean_P_ss_m_all_max, pch = c(22, rep (21, 11)), bg = c('black', rep ('gray', 10), 'white'))
+mtext (side = 3, text = '(d)', adj = -.25, line = 2, cex = 1.1, font = 2)
+
+plot (b1_mean ~ iir, mean_P_ss_m_all_max, xlim = c(0, 3.5), ylim = c(-.1, .1), type = 'n', las = 1, xaxt = 'n', bty = 'l', ann = F)
+title (xlab = list ('Relative ITV index'), ylab = 'SSR', line = 2.5)
+title (main = list ("Site-specific CWM ~ env\nRegression slope estimate", cex = 1))
+axis (1, at = seq (0, 3, by = 0.5), labels = format (seq (0, 3, by = 0.5)))
+axis (1, at = 3.5, labels = expression (infinity))
+for (i in seq (1, nrow (mean_P_ss_m_all_max)))
+{
+  lines (x = c(mean_P_ss_m_all_max[i, 'iir'], mean_P_ss_m_all_max[i, 'iir']), y = c(mean_P_ss_m_all_max[i, 'b1_mean'] - sd_P_ss_m_all_max[i, 'b1_mean'], c(mean_P_ss_m_all_max[i, 'b1_mean'] + sd_P_ss_m_all_max[i, 'b1_mean'])), col = 'darkgrey')
+}
+lines (b1_mean ~ iir, mean_P_ss_m_all_max[-12,], lty = c('solid'))
+lines (b1_mean ~ iir, mean_P_ss_m_all_max[-1:-10,], lty = c('dashed'))
+points (b1_mean ~ iir, mean_P_ss_m_all_max, pch = c(22, rep (21, 11)), bg = c('black', rep ('gray', 10), 'white'))
+mtext (side = 3, text = '(d)', adj = -.25, line = 2, cex = 1.1, font = 2)
+
+plot (b1_se_mean ~ iir, mean_P_ss_m_all_max, xlim = c(0, 3.5), ylim = c(0, .2), type = 'n', las = 1, xaxt = 'n', bty = 'l', ann = F)
+title (xlab = list ('Relative ITV index'), ylab = 'SSR', line = 2.5)
+title (main = list ("Site-specific CWM ~ env\nError of the regression slope", cex = 1))
+axis (1, at = seq (0, 3, by = 0.5), labels = format (seq (0, 3, by = 0.5)))
+axis (1, at = 3.5, labels = expression (infinity))
+for (i in seq (1, nrow (mean_P_ss_m_all_max)))
+{
+  lines (x = c(mean_P_ss_m_all_max[i, 'iir'], mean_P_ss_m_all_max[i, 'iir']), y = c(mean_P_ss_m_all_max[i, 'b1_se_mean'] - sd_P_ss_m_all_max[i, 'b1_se_mean'], c(mean_P_ss_m_all_max[i, 'b1_se_mean'] + sd_P_ss_m_all_max[i, 'b1_se_mean'])), col = 'darkgrey')
+}
+lines (b1_se_mean ~ iir, mean_P_ss_m_all_max[-12,], lty = c('solid'))
+lines (b1_se_mean ~ iir, mean_P_ss_m_all_max[-1:-10,], lty = c('dashed'))
+points (b1_se_mean ~ iir, mean_P_ss_m_all_max, pch = c(22, rep (21, 11)), bg = c('black', rep ('gray', 10), 'white'))
+mtext (side = 3, text = '(d)', adj = -.25, line = 2, cex = 1.1, font = 2)
 
 # Case study: Lalashan Forest Dynamics Plot data ----
 
-# Import data (https://github.com/zdealveindy/ITV_CWM) ----
-com <- read.delim ("https://raw.githubusercontent.com/zdealveindy/ITV_CWM/main/LFDP025_com.txt")
-traits <- read.delim ("https://raw.githubusercontent.com/zdealveindy/ITV_CWM/main/LFDP025_traits.txt")
-topo <- read.delim ("https://raw.githubusercontent.com/zdealveindy/ITV_CWM/main/LFDP025_topo.txt")
+# Import data ----
 
-# Define functions ----
-# Define function quantifying the Type I error rate inflation for parametric test site-specific CWM - env relationship
+#setwd ("c:\\Users\\Zeleny\\Dropbox\\CLANKY\\CWM and intraspecific trait variation\\scripts\\")
+#setwd ('c:\\Users\\zeleny\\Documents\\David clanky\\CWM ITV paper\\')
+setwd ('h:\\Dropbox_select\\CLANKY\\CWM and intraspecific trait variation\\scripts\\')
+
+com <- read.delim ("LFDP_com.txt")
+traits <- read.delim ("LFDP_traits.txt")
+topo <- read.delim ("LFDP_topo.txt")
+
 inflation_ss <- function (com, traits_ss, env, alpha = 0.05, nrep = 1000) 
 {
   p_null <- replicate (nrep, expr = {
@@ -320,7 +459,6 @@ inflation_ss <- function (com, traits_ss, env, alpha = 0.05, nrep = 1000)
   return (inflation)
 }
 
-# Define function quantifying the Type I error rare inflation for parametric test of intraspecific CWM - env relationship
 inflation_itv <- function (com, traits_ss, env, alpha = 0.05, nrep = 1000) 
 {
   p_null <- replicate (nrep, expr = {
@@ -332,7 +470,6 @@ inflation_itv <- function (com, traits_ss, env, alpha = 0.05, nrep = 1000)
   return (inflation)
 }    
 
-# Define function quantifying the Type I error rare inflation for ITV extended max perm. tests of site-specific CWM - env relationship
 inflation_ss_max <- function (com, traits_ss, env, alpha = 0.05, nrep = 1000, perm = 199) 
 {
   p_null <- replicate (nrep, expr = {
@@ -343,7 +480,6 @@ inflation_ss_max <- function (com, traits_ss, env, alpha = 0.05, nrep = 1000, pe
   return (inflation)
 }
 
-# Define function quantifying the Type I error rare inflation for ITV extended max perm. tests of site-specific CWM - env relationship - parallelized version
 inflation_ss_max_parallel <- function (com, traits_ss, env, alpha = 0.05, nrep = 1000, perm = 199, nclust = 20) 
 {
   cl <- makeCluster (nclust)
@@ -357,13 +493,19 @@ inflation_ss_max_parallel <- function (com, traits_ss, env, alpha = 0.05, nrep =
   return (inflation)
 }
 
-
 # Calculate CA1 of each site ----
 CA1 <- scores (cca (com), choices = 1, display = "site")
 
 # Calculate site-specific traits ----
 trait_types <- factor (c("LA", "Lth", "SLA", "LDMC"), levels = c("LA", "Lth", "SLA", "LDMC"), ordered = T)
 
+# traits_ss <- traits %>%
+#   mutate (LA = log10 (LA),
+#           SLA = log10 (SLA)) %>%
+#   group_by (subplot, species) %>%
+#   summarise_at (as.character (trait_types), mean)
+
+# First summarise and average, then transform
 traits_ss <- traits %>%
   group_by (subplot, species) %>%
   summarise_at (as.character (trait_types), mean) %>%
@@ -378,14 +520,14 @@ traits_ss_array <- traits_ss %>%
   lapply (function (x) column_to_rownames (x, "subplot")) %>%
   abind (along = 3)
 
-# Calculates relative ITV index ----
+# Calculates inflation factors ----
 var_ratio <- apply (traits_ss_array, 3, FUN = function (x) intra_inter_ratio (x))
 
-# Calculates inflation factors ----
 set.seed (48468) # set for reproducibility
 # inflation of site-specific CWM 
 IF_ss_CA1 <- apply (traits_ss_array, 3, FUN = function (x) inflation_ss (com, x, CA1, nrep = 10000))
 IF_ss_windwardness <- apply (traits_ss_array, 3, FUN = function (x) inflation_ss (com, x, topo$windwardness, nrep = 10000))
+
 
 set.seed (62654) # set for reproducibility
 # inflation of intraspecific CWM
@@ -394,13 +536,13 @@ IF_itv_windwardness <- apply (traits_ss_array, 3, FUN = function (x) inflation_i
 
 set.seed (98461) # set for reproducibility
 # inflation of site-specific CWM tested by newly introduced max test
-IF_ss_max_CA1 <- apply (traits_ss_array, 3, FUN = function (x) inflation_ss_max_parallel (com = com, traits_ss = x, env = CA1, nrep = 10000, perm = 199, nclust = no_clus))
+IF_ss_max_CA1 <- apply (traits_ss_array, 3, FUN = function (x) inflation_ss_max_parallel (com = com, traits_ss = x, env = CA1, nrep = 10000, perm = 199, nclust = 20))
 
-IF_ss_max_windwardness <- apply (traits_ss_array, 3, FUN = function (x) inflation_ss_max_parallel (com = com, traits_ss = x, env = topo$windwardness, nrep = 10000, perm = 199, nclust = no_clus)) 
+IF_ss_max_windwardness <- apply (traits_ss_array, 3, FUN = function (x) inflation_ss_max_parallel (com = com, traits_ss = x, env = topo$windwardness, nrep = 10000, perm = 199, nclust = 20)) 
 
 #save (list = c('IF_ss_max_CA1','IF_ss_max_windwardness'), file = 'IF_ss_max.RData')
 
-# Draws figures with dependence of inflation factor on intraspecific trait variation ----
+# Drawing figures with dependence of inflation factor on intraspecific trait variation ----
 jpeg (filename = "inflation.factors.jpg", width = 12, height = 12, units = 'cm', res = 600, pointsize = 8)
 par (mfrow = c(2,2))
 par (mar = c(5, 4, 2, 2), xpd = F)
@@ -430,6 +572,58 @@ abline (h = 1, col = 'grey', lty = 'dashed')
 mtext (side = 3, text = '(c)', adj = -.25, line = 0, cex = 1.1, font = 2)
 
 dev.off ()
+
+
+# Power tests ----
+#library (simcom)
+#library (parallel)
+#library (tidyverse)
+complete_test <- function (totS, Np, m){
+  sim <- simul.comm (totS = totS, min.niche.breath = 500, max.niche.breath = 5000) # 50 species
+  sam <- sample.comm (sim, Np = Np) # 25 sites
+  com <- sam$a.mat
+  env <- sam$sample.x
+  traits_ss <- gen_traits_ss (com = com, env = env, m = m, scale = TRUE, jitter = 1, amount = 500)
+  traits_fixed <- colMeans (traits_ss, na.rm = T)
+  CWM_SS <- cwm_ss (com = com, traits_ss = traits_ss)
+  CWM_fixed <- cwm (com, traits_fixed)
+  CWM_ITV <- cwm_itv (com = com, traits_ss = sample_traits_ss (traits_ss))
+  TEST_ITV <- test_cwm_itv (com = com, traits_ss = traits_ss, env = env)
+  TEST_SS <- test_cwm_ss (com = com, traits_ss = traits_ss, env = env)
+  P <- c (TEST_SS$P_par, TEST_SS$P_max, TEST_ITV$P_par)
+  return (P < 0.05)
+}
+
+res <- expand.grid (no_spe = c(10, 25, 50, 100), no_sit = c(10, 25, 50, 100), m = c(-1, -0.2, 0, 0.2, 1), repl = 1:1000)
+res <- cbind (res, SS_P_par = 0, SS_P_max = 0, ITV_P_par = 0)
+
+cl <- makeCluster(16)
+clusterExport (cl, list ('complete_test', 'gen_traits_ss', 'cwm_ss', 'cwm', 'cwm_itv', 'sample_traits_ss', 'test_cwm_itv', 'test_cwm_ss'))
+clusterEvalQ (cl, library (simcom))
+res_apply <- parApply (cl, res, 1, FUN = function (x) try (expr = complete_test (totS = x[1], Np = x[2], m = x[3]), silent = TRUE))
+stopCluster (cl)
+
+res_apply_backup <- res_apply
+res_apply_orig <- res_apply
+
+lapply (which (sapply (res_apply_orig, FUN = function (x) !is.logical (x))), FUN = function (i) res_apply[[i]] <- as.logical (c(NA, NA, NA)))
+
+res[,5:7] <- do.call ('rbind.data.frame',  (res_apply))
+res2 <- res[res[,5] %in% c('TRUE', 'FALSE'),]
+
+res_sum <- res %>% group_by (no_spe, no_sit, m) %>% summarise (SS_P_par = sum (as.logical (SS_P_par))/n(), SS_P_max = sum (as.logical (SS_P_max))/n(), ITV_P_par = sum (as.logical (ITV_P_par))/n())
+
+p <- res_sum %>% rename (c('No. species' = 'no_spe')) %>%
+  gather (key = P_type, value = P_val, SS_P_par:ITV_P_par) %>%
+  ggplot (aes (x = no_sit, y = P_val, colour = P_type )) + 
+  geom_line () + 
+  facet_grid (rows = vars (`No. species`), cols = vars (m), as.table = FALSE, labeller = label_both) + 
+  theme_bw () +
+  xlab ('No. sites') + 
+  ylab ('Proportion of significant results (P < 0.05)') +
+  guides(colour=guide_legend(title="Test type"))
+
+ggsave (filename = 'power_test.jpeg', plot = p, width = 6.25, height = 5, units = 'in')
 
 # Testing pairwise significance of traits and env. variables from LFDP  ----
 
@@ -496,14 +690,17 @@ p_values [9, ] <- apply (traits_ss_array, 3, function (x)
 write.csv (p_values, file = "p.values.csv")
 
 # Drawing regressions of CWM and env from LFDP data ----
-# Defines the plotting function
 plot_cwm_reg <- function (CWM_ss, CWM_f, CWM_itv, env, P_ss = NULL, P_f = NULL, P_itv = NULL, xlab = 'Env', ylab = 'CWM', plot.legend = TRUE, pos.legend = 'topright', ...)
 {
   CWM_ss_scaled <- scale (CWM_ss)
   CWM_f_scaled <- scale (CWM_f)
   CWM_itv_scaled <- scale (CWM_itv)
   
+  #cols <- RColorBrewer::brewer.pal(n = 3, name = 'Dark2')
   cols <- grey.colors(3, start = 0.2, end = 0.8)
+  #cols <- rep ('black', 3)
+  #cols <- 1:3
+  
   col_CWM_ss <- cols[1]
   col_CWM_f <- cols[2]
   col_CWM_itv <- cols[3]
@@ -527,22 +724,6 @@ plot_cwm_reg <- function (CWM_ss, CWM_f, CWM_itv, env, P_ss = NULL, P_f = NULL, 
   if (plot.legend) legend (pos.legend, pch = 15:17, col = cols, cex = 0.9, legend = c('ss CWM', 'f CWM', 'is CWM'), bty = 'n', lwd = 2, lty = c(ifelse (P_ss < 0.05, "solid", "dotted"), ifelse (P_f < 0.05, "solid", "dotted"), ifelse (P_itv < 0.05, "solid", "dotted")))
   
 }
-
-CWM_ss_LA <- cwm_ss (com, traits_ss_array [, , "LA"])
-CWM_f_LA <- cwm_f (com, traits_ss_array [, , "LA"])
-CWM_itv_LA <- cwm_itv (com, traits_ss_array [, , "LA"])
-
-CWM_ss_Lth <- cwm_ss (com, traits_ss_array [, , "Lth"])
-CWM_f_Lth <- cwm_f (com, traits_ss_array [, , "Lth"])
-CWM_itv_Lth <- cwm_itv (com, traits_ss_array [, , "Lth"])
-
-CWM_ss_SLA <- cwm_ss (com, traits_ss_array [, , "SLA"])
-CWM_f_SLA <- cwm_f (com, traits_ss_array [, , "SLA"])
-CWM_itv_SLA <- cwm_itv (com, traits_ss_array [, , "SLA"])
-
-CWM_ss_LDMC <- cwm_ss (com, traits_ss_array [, , "LDMC"])
-CWM_f_LDMC <- cwm_f (com, traits_ss_array [, , "LDMC"])
-CWM_itv_LDMC <- cwm_itv (com, traits_ss_array [, , "LDMC"])
 
 jpeg (filename = "CWM-env_regressions.jpg", width = 12, height = 12, units = 'cm', res = 600, pointsize = 8)
 par (mfrow = c(2,2))
@@ -596,44 +777,54 @@ relvar_part <- function (com, traits_ss, env) {
   return (c(rel_f, rel_itv, rel_cov))
 }
 
+
 env_types <- c("total", colnames (topo))
+
 var_resource <- c("Fixed", "ITV", "Cov")
 
 rel_LA <- matrix (nrow = length (env_types), ncol = length (var_resource),
                   dimnames = list (env_types, var_resource))
 
 rel_LA [1, ] <- relvar_total (com, traits_ss_array [, , "LA"])
-rel_LA [2:4, ] <- t (apply (topo, 2, function (x) relvar_part (com, traits_ss_array [, , "LA"], x)))
+rel_LA [2:4, ] <- t (apply (topo, 2, function (x) relvar_part 
+                            (com, traits_ss_array [, , "LA"], x)))
 rel_LA <- rel_LA %>%
   as.data.frame () %>%
   rownames_to_column ("env") %>%
   mutate (trait = "LA") %>%
   gather (key = variation, value = value, all_of (as.character (var_resource)))
 
-rel_Lth <- matrix (nrow = length (env_types), ncol = length (var_resource), dimnames = list (env_types, var_resource))
+rel_Lth <- matrix (nrow = length (env_types), ncol = length (var_resource),
+                   dimnames = list (env_types, var_resource))
 
 rel_Lth [1, ] <- relvar_total (com, traits_ss_array [, , "Lth"])
-rel_Lth [2:4, ] <- t (apply (topo, 2, function (x) relvar_part (com, traits_ss_array [, , "Lth"], x)))
+rel_Lth [2:4, ] <- t (apply (topo, 2, function (x) relvar_part 
+                             (com, traits_ss_array [, , "Lth"], x)))
 rel_Lth <- rel_Lth %>%
   as.data.frame () %>%
   rownames_to_column ("env") %>%
   mutate (trait = "Lth") %>%
   gather (key = variation, value = value, all_of (as.character (var_resource)))
 
-rel_SLA <- matrix (nrow = length (env_types), ncol = length (var_resource), dimnames = list (env_types, var_resource))
+rel_SLA <- matrix (nrow = length (env_types), ncol = length (var_resource),
+                   dimnames = list (env_types, var_resource))
 
 rel_SLA [1, ] <- relvar_total (com, traits_ss_array [, , "SLA"])
-rel_SLA [2:4, ] <- t (apply (topo, 2, function (x) relvar_part (com, traits_ss_array [, , "SLA"], x)))
+rel_SLA [2:4, ] <- t (apply (topo, 2, function (x) relvar_part 
+                             (com, traits_ss_array [, , "SLA"], x)))
 rel_SLA <- rel_SLA %>%
   as.data.frame () %>%
   rownames_to_column ("env") %>%
   mutate (trait = "SLA") %>%
   gather (key = variation, value = value, all_of (as.character (var_resource)))
 
-rel_LDMC <- matrix (nrow = length (env_types), ncol = length (var_resource), dimnames = list (env_types, var_resource))
+
+rel_LDMC <- matrix (nrow = length (env_types), ncol = length (var_resource),
+                    dimnames = list (env_types, var_resource))
 
 rel_LDMC [1, ] <- relvar_total (com, traits_ss_array [, , "LDMC"])
-rel_LDMC [2:4, ] <- t (apply (topo, 2, function (x) relvar_part (com, traits_ss_array [, , "LDMC"], x)))
+rel_LDMC [2:4, ] <- t (apply (topo, 2, function (x) relvar_part 
+                              (com, traits_ss_array [, , "LDMC"], x)))
 rel_LDMC <- rel_LDMC %>%
   as.data.frame () %>%
   rownames_to_column ("env") %>%
@@ -646,14 +837,15 @@ plot_table <- rbind (rel_LA, rel_Lth, rel_SLA, rel_LDMC) %>%
           variation = factor (variation, levels = var_resource, ordered = T)) 
 
 library (lattice)
-jpeg (filename = "variation.partitioning.jpg", width = 8, height = 6, units = "in", res = 600, quality = 100)
+jpeg (filename = "variation.partitioning.jpg", width = 8, height = 6,
+      units = "in", res = 600, quality = 100)
 barchart (value ~ variation | trait + env, data = plot_table,
           origin = 0, strip = F,
           col = c("grey55", "grey75", "white"),
           xlab = "Source of trait variations",
           ylab = "Relative variation (%)",
           xlab.top = c("log (LA)", "Lth", "log (SLA)", "LDMC"),
-          ylab.right = list (c("Windwardness", "Convexity", "Elevation", "Total"), rot = 270),
+          ylab.right = c("Windwardness", "Convexity", "Elevation", "Total"),
           scales = list (alternating = 
                            rep (1, length (trait_types) * length (env_types)),
                          tck = c(0.8, 0)),
@@ -669,3 +861,4 @@ barchart (value ~ variation | trait + env, data = plot_table,
                          cex = c(1, 0.1, 1, 0.1, 1))
           ))
 dev.off ()
+
