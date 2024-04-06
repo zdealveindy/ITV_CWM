@@ -232,23 +232,20 @@ plot_itv (com = com, traits_ss = traits_ss, env = env)
 plot_f (com = com, traits_ss = traits_ss, env = env)
 plot_ss (com = com, traits_ss = sample_traits_ss (traits_ss, intra = TRUE), env = env)  # plots intraspecific trait variation
 
-# Change number of clusters ----
-no_clus <- 10
-
 # CWM site specific tested by combined permutation test + all other tests ----
-perm <- 100 #1000  # how many standard test per community is done
-no_rep <- 5 #50  # replicate community data (with the same parameters)
+perm <- 1000 #1000  # how many standard test per community is done
+no_rep <- 50 #50  # replicate community data (with the same parameters)
 
 set.seed (35974)
 
-cl <- makeCluster(no_clus)
+cl <- makeCluster(16)
 clusterEvalQ (cl, {library (weimea); library (simcom)})
 clusterExport (cl, varlist = c('cwm_ss', 'cwm_itv', 'gen_traits_ss', 'sample_traits_ss', 'perm', 'intra_inter_ratio', 'test_cwm_ss'))
 
 P_ss_m_all_max <- parLapply (cl, 1:no_rep, fun = function (x) {
   
-  sim <- simul.comm (totS = 50, min.niche.breath = 2500, max.niche.breath = 5000) # 50 species
-  sam <- sample.comm (sim, Np = 25) # 25 sites
+  sim <- simul.comm (totS = 100, min.niche.breath = 2500, max.niche.breath = 5000) # orign 50 species
+  sam <- sample.comm (sim, Np = 100) # orig 25 sites
   com <- sam$a.mat
   env <- sam$sample.x
   
@@ -282,8 +279,8 @@ P_ss_m_all_max <- parLapply (cl, 1:no_rep, fun = function (x) {
 stopCluster (cl)
 
 # Save the data which are result of costly calculation
-#save (P_ss_m_all_max, file = 'P_ss_m_all_max_20220921.r')
-#load (file = 'P_ss_m_all_max_20220921.r')
+# save (P_ss_m_all_max, file = 'P_ss_m_all_max_20240330.RData')
+# load (file = 'P_ss_m_all_max_20240330.RData')
 
 summary_P_ss_m_all_max <- sapply (P_ss_m_all_max, simplify = 'array', FUN = function (repl)
   sapply (repl, FUN = function (x)
@@ -314,7 +311,7 @@ par (mfrow = c(2,2))
 # Plot results for CWM_SS and standard parametric test
 plot (P_par_IF ~ iir, mean_P_ss_m_all_max, xlim = c(0, 3.5), ylim = c(0, 16), type = 'n', las = 1, xaxt = 'n', bty = 'l', ann = F)
 title (xlab = list ('Relative ITV index'), ylab = expression (Inflation~index~(alpha==0.05)), line = 2.5)
-title (main = list ("Site-specific CWM ~ env\nStandard parametric test", cex = 1))
+title (main = list ("Site-specific CWM ~ env\nStandard parametric test", cex = 1, font = 1))
 axis (1, at = seq (0, 3, by = 0.5), labels = format (seq (0, 3, by = 0.5)))
 axis (1, at = 3.5, labels = expression (infinity))
 abline (h = 1, col = 'grey', lty = 'dashed')
@@ -330,7 +327,7 @@ mtext (side = 3, text = '(a)', adj = -.25, line = 2, cex = 1.1, font = 2)
 # Plot results for CWM_ITV and standard parametric test
 plot (P_par_itv_IF ~ iir, mean_P_ss_m_all_max, xlim = c(0, 3.5), ylim = c(0, 1.5), type = 'n', las = 1, xaxt = 'n', bty = 'l', ann = FALSE)
 title (xlab = list ('Relative ITV index'), ylab = expression (Inflation~index~(alpha==0.05)), line = 2.5)
-title (main = list ("Intraspecific CWM ~ env\nStandard parametric test", cex = 1))
+title (main = list ("Intraspecific CWM ~ env\nStandard parametric test", cex = 1, font = 1))
 axis (1, at = seq (0, 3, by = 0.5), labels = format (seq (0, 3, by = 0.5)))
 axis (1, at = 3.5, labels = expression (infinity))
 abline (h = 1, col = 'grey', lty = 'dashed')
@@ -347,7 +344,7 @@ mtext (side = 3, text = '(b)', adj = -.25, line = 2, cex = 1.1, font = 2)
 # Plot results for CWM_ss and max test of row- and combined col-based permutation tests
 plot (P_max_IF ~ iir, mean_P_ss_m_all_max, xlim = c(0, 3.5), ylim = c(0, 16), type = 'n', las = 1, xaxt = 'n', bty = 'l', ann = FALSE)
 title (xlab = list ('Relative ITV index'), ylab = expression (Inflation~index~(alpha==0.05)), line = 2.5)
-title (main = list ("Site-specific CWM ~ env\n'Max' permutation test", cex = 1))
+title (main = list ("Site-specific CWM ~ env\n'Max' permutation test", cex = 1, font = 1))
 axis (1, at = seq (0, 3, by = 0.5), labels = format (seq (0, 3, by = 0.5)))
 axis (1, at = seq (0, 3, by = 0.5), labels = format (seq (0, 3, by = 0.5)))
 axis (1, at = 3.5, labels = expression (infinity))
@@ -362,23 +359,9 @@ lines (P_max_IF ~ iir, mean_P_ss_m_all_max[-1:-10,], lty = c('dashed'))
 points (P_max_IF ~ iir, mean_P_ss_m_all_max, pch = c(22, rep (21, 11)), bg = c('black', rep ('gray', 10), 'white'))
 mtext (side = 3, text = '(c)', adj = -.25, line = 2, cex = 1.1, font = 2)
 
-plot (R2_ss_mean ~ iir, mean_P_ss_m_all_max, xlim = c(0, 3.5), ylim = c(0, 0.5), type = 'n', las = 1, xaxt = 'n', bty = 'l', ann = F)
-title (xlab = list ('Relative ITV index'), ylab = expression (r^2), line = 2.5)
-title (main = list ("Site-specific CWM ~ env\nExplained variation", cex = 1))
-axis (1, at = seq (0, 3, by = 0.5), labels = format (seq (0, 3, by = 0.5)))
-axis (1, at = 3.5, labels = expression (infinity))
-abline (h = 1/(25-1), col = 'grey', lty = 'dashed')
-for (i in seq (1, nrow (mean_P_ss_m_all_max)))
-{
-  lines (x = c(mean_P_ss_m_all_max[i, 'iir'], mean_P_ss_m_all_max[i, 'iir']), y = c(mean_P_ss_m_all_max[i, 'R2_ss_mean'] - sd_P_ss_m_all_max[i, 'R2_ss_mean'], c(mean_P_ss_m_all_max[i, 'R2_ss_mean'] + sd_P_ss_m_all_max[i, 'R2_ss_mean'])), col = 'darkgrey')
-}
-lines (R2_ss_mean ~ iir, mean_P_ss_m_all_max[-12,], lty = c('solid'))
-lines (R2_ss_mean ~ iir, mean_P_ss_m_all_max[-1:-10,], lty = c('dashed'))
-points (R2_ss_mean ~ iir, mean_P_ss_m_all_max, pch = c(22, rep (21, 11)), bg = c('black', rep ('gray', 10), 'white'))
-mtext (side = 3, text = '(d)', adj = -.25, line = 2, cex = 1.1, font = 2)
 dev.off ()
 
-# Effect sizes and ITV ---
+# Effect sizes and ITV ----
 plot (R2_ss_mean ~ iir, mean_P_ss_m_all_max, xlim = c(0, 3.5), ylim = c(0, 0.5), type = 'n', las = 1, xaxt = 'n', bty = 'l', ann = F)
 title (xlab = list ('Relative ITV index'), ylab = expression (r^2), line = 2.5)
 title (main = list ("Site-specific CWM ~ env\nExplained variation", cex = 1))
@@ -438,7 +421,7 @@ mtext (side = 3, text = '(d)', adj = -.25, line = 2, cex = 1.1, font = 2)
 
 # Case study: Lalashan Forest Dynamics Plot data ----
 
-# Import data ----
+## Import data ----
 
 #setwd ("c:\\Users\\Zeleny\\Dropbox\\CLANKY\\CWM and intraspecific trait variation\\scripts\\")
 #setwd ('c:\\Users\\zeleny\\Documents\\David clanky\\CWM ITV paper\\')
@@ -536,20 +519,21 @@ IF_itv_windwardness <- apply (traits_ss_array, 3, FUN = function (x) inflation_i
 
 set.seed (98461) # set for reproducibility
 # inflation of site-specific CWM tested by newly introduced max test
-IF_ss_max_CA1 <- apply (traits_ss_array, 3, FUN = function (x) inflation_ss_max_parallel (com = com, traits_ss = x, env = CA1, nrep = 10000, perm = 199, nclust = 20))
+IF_ss_max_CA1 <- apply (traits_ss_array, 3, FUN = function (x) inflation_ss_max_parallel (com = com, traits_ss = x, env = CA1, nrep = 10000, perm = 199, nclust = 10))
 
-IF_ss_max_windwardness <- apply (traits_ss_array, 3, FUN = function (x) inflation_ss_max_parallel (com = com, traits_ss = x, env = topo$windwardness, nrep = 10000, perm = 199, nclust = 20)) 
+IF_ss_max_windwardness <- apply (traits_ss_array, 3, FUN = function (x) inflation_ss_max_parallel (com = com, traits_ss = x, env = topo$windwardness, nrep = 10000, perm = 199, nclust = 10)) 
 
-#save (list = c('IF_ss_max_CA1','IF_ss_max_windwardness'), file = 'IF_ss_max.RData')
+# save (list = c('IF_ss_max_CA1','IF_ss_max_windwardness'), file = 'IF_ss_max.RData')
+# load ('IF_ss_max.RData')
 
 # Drawing figures with dependence of inflation factor on intraspecific trait variation ----
-jpeg (filename = "inflation.factors.jpg", width = 12, height = 12, units = 'cm', res = 600, pointsize = 8)
+jpeg (filename = "inflation.factors2.jpg", width = 12, height = 12, units = 'cm', res = 600, pointsize = 8)
 par (mfrow = c(2,2))
 par (mar = c(5, 4, 2, 2), xpd = F)
 
 plot (IF_ss_CA1 ~ var_ratio, type = "n", las = 1, bty = 'l', ann = F, xlim = c(0.2, 0.7), ylim = c(0, 6.5))
 title (xlab = list ('Relative ITV index'), ylab = expression (Inflation~ index~(alpha==0.05)), line = 2.5)
-title (main = list ("Site-specific CWM ~ env\nStandard parametric test", cex = 1))
+title (main = list ("Site-specific CWM ~ env\nStandard parametric test", cex = 1, font = 1))
 text (IF_ss_CA1 ~ var_ratio, labels = trait_types, cex = 0.7, font = 1, col = "black")
 text (IF_ss_windwardness ~ var_ratio, labels = trait_types, cex = 0.7, font = 3, col = "grey50")
 abline (h = 1, col = 'grey', lty = 'dashed')
@@ -557,7 +541,7 @@ mtext (side = 3, text = '(a)', adj = -.25, line = 0, cex = 1.1, font = 2)
 
 plot (IF_ss_max_CA1 ~ var_ratio, type = "n", las = 1, bty = 'l', ann = F, xlim = c(0.2, 0.7), ylim = c(0, 6.5))
 title (xlab = list ('Relative ITV index'), ylab = expression (Inflation~ index~(alpha==0.05)), line = 2.5)
-title (main = list ("Intraspecific CWM ~ env\nStandard parametric test", cex = 1))
+title (main = list ("Intraspecific CWM ~ env\nStandard parametric test", cex = 1, font = 1))
 text (IF_ss_max_CA1 ~ var_ratio, labels = trait_types,  cex = 0.7, font = 1, col = "black")
 text (IF_ss_max_windwardness ~ var_ratio, labels = trait_types, cex = 0.7, font = 3, col = "grey50")
 abline (h = 1, col = 'grey', lty = 'dashed')
@@ -565,7 +549,7 @@ mtext (side = 3, text = '(b)', adj = -.25, line = 0, cex = 1.1, font = 2)
 
 plot (IF_itv_CA1 ~ var_ratio, type = "n", las = 1, bty = 'l', ann = F, xlim = c(0.2, 0.7), ylim = c(0, 6.5))
 title (xlab = list ('Relative ITV index'), ylab = expression (Inflation~ index~(alpha==0.05)), line = 2.5)
-title (main = list ("Site-specific CWM ~ env\n'Max' permutation test", cex = 1))
+title (main = list ("Site-specific CWM ~ env\n'Max' permutation test", cex = 1, font = 1))
 text (IF_itv_CA1 ~ var_ratio, labels = trait_types, cex = 0.7, font = 1, col = "black")
 text (IF_itv_windwardness ~ var_ratio, labels = trait_types, cex = 0.7, font = 3, col = "grey50")
 abline (h = 1, col = 'grey', lty = 'dashed')
@@ -611,7 +595,7 @@ lapply (which (sapply (res_apply_orig, FUN = function (x) !is.logical (x))), FUN
 res[,5:7] <- do.call ('rbind.data.frame',  (res_apply))
 res2 <- res[res[,5] %in% c('TRUE', 'FALSE'),]
 
-res_sum <- res %>% group_by (no_spe, no_sit, m) %>% summarise (SS_P_par = sum (as.logical (SS_P_par))/n(), SS_P_max = sum (as.logical (SS_P_max))/n(), ITV_P_par = sum (as.logical (ITV_P_par))/n())
+res_sum <- res %>% group_by (no_spe, no_sit, m) %>% summarise (SS_P_par = sum (as.logical (SS_P_par), na.rm = TRUE)/n (), SS_P_max = sum (as.logical (SS_P_max), na.rm = TRUE)/n(), ITV_P_par = sum (as.logical (ITV_P_par), na.rm = TRUE)/n())
 
 p <- res_sum %>% rename (c('No. species' = 'no_spe')) %>%
   gather (key = P_type, value = P_val, SS_P_par:ITV_P_par) %>%
@@ -619,7 +603,7 @@ p <- res_sum %>% rename (c('No. species' = 'no_spe')) %>%
   geom_line () + 
   facet_grid (rows = vars (`No. species`), cols = vars (m), as.table = FALSE, labeller = label_both) + 
   theme_bw () +
-  xlab ('No. sites') + 
+  xlab ('No. samples') + 
   ylab ('Proportion of significant results (P < 0.05)') +
   guides(colour=guide_legend(title="Test type"))
 
@@ -696,11 +680,7 @@ plot_cwm_reg <- function (CWM_ss, CWM_f, CWM_itv, env, P_ss = NULL, P_f = NULL, 
   CWM_f_scaled <- scale (CWM_f)
   CWM_itv_scaled <- scale (CWM_itv)
   
-  #cols <- RColorBrewer::brewer.pal(n = 3, name = 'Dark2')
   cols <- grey.colors(3, start = 0.2, end = 0.8)
-  #cols <- rep ('black', 3)
-  #cols <- 1:3
-  
   col_CWM_ss <- cols[1]
   col_CWM_f <- cols[2]
   col_CWM_itv <- cols[3]
@@ -786,8 +766,8 @@ rel_LA <- matrix (nrow = length (env_types), ncol = length (var_resource),
                   dimnames = list (env_types, var_resource))
 
 rel_LA [1, ] <- relvar_total (com, traits_ss_array [, , "LA"])
-rel_LA [2:4, ] <- t (apply (topo, 2, function (x) relvar_part 
-                            (com, traits_ss_array [, , "LA"], x)))
+rel_LA [2:4, ] <- t (apply (topo, 2, function (x) 
+  relvar_part (com, traits_ss_array [, , "LA"], x)))
 rel_LA <- rel_LA %>%
   as.data.frame () %>%
   rownames_to_column ("env") %>%
@@ -798,8 +778,8 @@ rel_Lth <- matrix (nrow = length (env_types), ncol = length (var_resource),
                    dimnames = list (env_types, var_resource))
 
 rel_Lth [1, ] <- relvar_total (com, traits_ss_array [, , "Lth"])
-rel_Lth [2:4, ] <- t (apply (topo, 2, function (x) relvar_part 
-                             (com, traits_ss_array [, , "Lth"], x)))
+rel_Lth [2:4, ] <- t (apply (topo, 2, function (x) 
+  relvar_part (com, traits_ss_array [, , "Lth"], x)))
 rel_Lth <- rel_Lth %>%
   as.data.frame () %>%
   rownames_to_column ("env") %>%
@@ -810,8 +790,8 @@ rel_SLA <- matrix (nrow = length (env_types), ncol = length (var_resource),
                    dimnames = list (env_types, var_resource))
 
 rel_SLA [1, ] <- relvar_total (com, traits_ss_array [, , "SLA"])
-rel_SLA [2:4, ] <- t (apply (topo, 2, function (x) relvar_part 
-                             (com, traits_ss_array [, , "SLA"], x)))
+rel_SLA [2:4, ] <- t (apply (topo, 2, function (x) 
+  relvar_part (com, traits_ss_array [, , "SLA"], x)))
 rel_SLA <- rel_SLA %>%
   as.data.frame () %>%
   rownames_to_column ("env") %>%
@@ -823,8 +803,8 @@ rel_LDMC <- matrix (nrow = length (env_types), ncol = length (var_resource),
                     dimnames = list (env_types, var_resource))
 
 rel_LDMC [1, ] <- relvar_total (com, traits_ss_array [, , "LDMC"])
-rel_LDMC [2:4, ] <- t (apply (topo, 2, function (x) relvar_part 
-                              (com, traits_ss_array [, , "LDMC"], x)))
+rel_LDMC [2:4, ] <- t (apply (topo, 2, function (x) 
+  relvar_part (com, traits_ss_array [, , "LDMC"], x)))
 rel_LDMC <- rel_LDMC %>%
   as.data.frame () %>%
   rownames_to_column ("env") %>%
